@@ -7,3 +7,5 @@
 - **VUL-02:** los filtros del catálogo (tipo, variedad y búsqueda) y la búsqueda por id se pasan como parámetros, no se concatenan.
 - **VUL-03:** el filtro de pedidos por mesa usa una consulta parametrizada.
 - **VUL-04:** el reporte por origen filtra con un parámetro en el `WHERE`, antes del `GROUP BY`, así que un `UNION` no puede leer otras tablas.
+- **VUL-13:** las contraseñas se guardan con hash bcrypt (costo 12), el login las verifica con `bcrypt.compare` y las filas viejas en texto plano se hashean al arrancar.
+- **VUL-27:** las contraseñas de las cuentas iniciales salen de variables de entorno y no quedan credenciales de fábrica en el código.
