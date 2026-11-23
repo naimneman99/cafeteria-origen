@@ -31,11 +31,5 @@ export default {
   // Se usa para firmar el token anti-CSRF.
   sessionSecret: requerida('SESSION_SECRET'),
 
-  // FALLA: credenciales por defecto que nunca se cambian.
-  credencialesPorDefecto: {
-    username: 'admin',
-    password: 'admin',
-  },
-
   uploadsDir: process.env.UPLOADS_DIR || path.join(__dirname, '..', 'uploads'),
 };

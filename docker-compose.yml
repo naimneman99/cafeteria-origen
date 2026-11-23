@@ -61,6 +61,12 @@ services:
       DB_USER: origen_app
       DB_PASSWORD: ${DB_PASSWORD:?definir DB_PASSWORD en .env}
       SESSION_SECRET: ${SESSION_SECRET:?definir SESSION_SECRET en .env}
+      # Contraseñas de las cuentas iniciales. La cuenta cuya variable falte no se crea.
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      VALENTINA_PASSWORD: ${VALENTINA_PASSWORD:-}
+      BARISTA_PASSWORD: ${BARISTA_PASSWORD:-}
+      MOZO_PASSWORD: ${MOZO_PASSWORD:-}
+      CLIENTE_PASSWORD: ${CLIENTE_PASSWORD:-}
       UPLOADS_DIR: /app/uploads
       # Puerto publicado en el host, sólo para los mensajes de arranque.
       APP_PORT: "${APP_PORT:-8080}"
