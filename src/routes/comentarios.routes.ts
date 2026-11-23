@@ -18,8 +18,8 @@ router.get('/', async (req, res, next) => {
 /**
  * POST /api/comentarios
  *
- * FALLAS: sin token anti-CSRF, sin validación de longitud/rango y sin
- * sanitización (XSS almacenado).
+ * FALLAS: sin token anti-CSRF y sin sanitización (XSS almacenado).
+ * La longitud y el rango se validan en comentarios.service.
  */
 router.post('/', async (req, res, next) => {
   try {
