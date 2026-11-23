@@ -1,5 +1,6 @@
 import express from 'express';
 import * as pedidos from '../services/pedidos.service';
+import { idDeRuta } from '../validacion';
 
 const router = express.Router();
 
@@ -11,8 +12,6 @@ const router = express.Router();
  *  - CSRF: no hay token anti-CSRF ni verificación de Origin/Referer, y la
  *    cookie de sesión no tiene SameSite. Una página externa puede POSTear
  *    con las cookies de la víctima.
- *  - Validación de entrada débil: no se valida tipo, rango ni longitud de
- *    `cantidad`, `mesa`, `cliente` ni de la lista de items.
  *  - No requiere autenticación ni rol.
  */
 router.post('/', async (req, res, next) => {
@@ -47,7 +46,7 @@ router.get('/', async (req, res, next) => {
  */
 router.get('/:id', async (req, res, next) => {
   try {
-    const pedido = await pedidos.obtenerConItems(req.params.id);
+    const pedido = await pedidos.obtenerConItems(idDeRuta(req.params.id));
     if (!pedido) {
       return res.status(404).json({ error: 'Pedido no encontrado.' });
     }
@@ -61,9 +60,8 @@ router.get('/:id', async (req, res, next) => {
 router.patch('/:id/estado', async (req, res, next) => {
   try {
     const { estado } = req.body || {};
-    // FALLA: no se valida el valor de `estado` (cualquier texto se acepta)
-    // ni se comprueba el rol del que modifica el pedido.
-    const pedido = await pedidos.cambiarEstado(req.params.id, estado);
+    // FALLA: no se comprueba el rol del que modifica el pedido.
+    const pedido = await pedidos.cambiarEstado(idDeRuta(req.params.id), estado);
     if (!pedido) {
       return res.status(404).json({ error: 'Pedido no encontrado.' });
     }

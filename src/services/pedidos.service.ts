@@ -1,5 +1,6 @@
 import * as db from '../db';
 import { calcularPrecio } from '../catalogo';
+import { ErrorValidacion, MAX_ID, entero, lista, objeto, texto, unoDe } from '../validacion';
 import type { Pedido, PedidoConItems, PedidoItem, Producto } from '../tipos';
 
 /** Un renglón del pedido, tal como llega en el cuerpo de la petición. */
@@ -18,43 +19,39 @@ export interface NuevoPedido {
 /** Id tal como llega en la URL (texto) o ya convertido. */
 type Id = number | string;
 
+/** Estados por los que pasa un pedido (lista blanca). */
+export const ESTADOS_PERMITIDOS = ['abierto', 'preparando', 'listo', 'entregado'] as const;
+export type EstadoPedido = (typeof ESTADOS_PERMITIDOS)[number];
+
+/** Límites de un pedido: los mismos que el formulario, más un tope de abuso. */
+const MAX_ITEMS = 20;
+const MAX_CANTIDAD = 20;
+const FORMATO_MESA = /^[A-Za-z0-9 -]+$/;
+
 /**
  * Servicio de pedidos.
  *
- * -----------------------------------------------------------------------------
- * FALLA — Validación de entrada débil o insuficiente (OWASP A04:2021)
- * -----------------------------------------------------------------------------
- * No se valida nada de lo que llega en el cuerpo de la petición:
- *  - `cantidad` puede ser negativa (el total del pedido queda negativo),
- *    cero, un número decimal o un texto.
- *  - No hay un máximo de items ni de cantidad (DoS / facturas absurdas).
- *  - `mesa` y `cliente` no se validan ni se acotan en longitud.
- *  - Si el productoId no existe, la excepción sube y se filtra el stack.
- *
- * La corrección es validar TIPO (entero), RANGO (1..N), LONGITUD y FORMATO
- * de cada campo en el servidor, usando listas blancas.
- * -----------------------------------------------------------------------------
+ * El cuerpo de la petición llega como `any`: los tipos de `NuevoPedido` no lo
+ * controlan en ejecución, así que cada campo se valida acá, en el servidor.
  */
 
 /**
  * Crea un pedido a partir de una lista de items { productoId, cantidad }.
  * Total = suma de calcularPrecio(producto) x cantidad
  */
-export async function crear({ mesa, cliente, items }: NuevoPedido): Promise<PedidoConItems | null> {
-  // FALLA: no se valida que items exista, sea un array, ni que cada cantidad
-  // sea un entero positivo. Los tipos de `NuevoPedido` NO alcanzan: el cuerpo
-  // de la petición llega como `any` y en ejecución puede traer cualquier cosa.
-  const filas: { productoId: number; cantidad: number; precioUnitario: number }[] = [];
+export async function crear(pedido: NuevoPedido): Promise<PedidoConItems | null> {
+  const { mesa, cliente, items } = validarPedido(pedido);
 
+  const filas: { productoId: number; cantidad: number; precioUnitario: number }[] = [];
   for (const item of items) {
-    // Si el producto no existe, buscarProducto devuelve null y `precio`
-    // revienta con un TypeError cuyo stack se filtra al cliente.
     const producto = await buscarProducto(item.productoId);
-    const precioUnitario = calcularPrecio(producto);
+    if (!producto) {
+      throw new ErrorValidacion(`El producto ${item.productoId} no existe.`);
+    }
     filas.push({
       productoId: producto.id,
       cantidad: item.cantidad,
-      precioUnitario,
+      precioUnitario: calcularPrecio(producto),
     });
   }
 
@@ -69,21 +66,37 @@ export async function crear({ mesa, cliente, items }: NuevoPedido): Promise<Pedi
      RETURNING *`,
     [mesa, cliente, total]
   );
-  const pedido = rows[0];
+  const creado = rows[0];
 
   for (const fila of filas) {
     await db.query(
       `INSERT INTO pedido_items (pedido_id, producto_id, cantidad, precio_unitario)
        VALUES ($1, $2, $3, $4)`,
-      [pedido.id, fila.productoId, fila.cantidad, fila.precioUnitario]
+      [creado.id, fila.productoId, fila.cantidad, fila.precioUnitario]
     );
   }
 
-  return obtenerConItems(pedido.id);
+  return obtenerConItems(creado.id);
+}
+
+/** Valida tipo, longitud y rango de cada campo del pedido. */
+function validarPedido(pedido: NuevoPedido): NuevoPedido {
+  const items = lista(pedido.items, 'items', 1, MAX_ITEMS).map((valor, i) => {
+    const item = objeto(valor, `items[${i}]`);
+    return {
+      productoId: entero(item.productoId, `items[${i}].productoId`, 1, MAX_ID),
+      cantidad: entero(item.cantidad, `items[${i}].cantidad`, 1, MAX_CANTIDAD),
+    };
+  });
+  return {
+    mesa: texto(pedido.mesa, 'mesa', 1, 10, FORMATO_MESA),
+    cliente: texto(pedido.cliente, 'cliente', 2, 40),
+    items,
+  };
 }
 
 /** Busca un producto por id (helper interno). */
-async function buscarProducto(productoId: number): Promise<Producto> {
+async function buscarProducto(productoId: number): Promise<Producto | undefined> {
   const { rows } = await db.query<Producto>('SELECT * FROM productos WHERE id = $1', [productoId]);
   return rows[0];
 }
@@ -117,7 +130,8 @@ export async function obtenerConItems(id: Id): Promise<PedidoConItems | null> {
 }
 
 /** Cambia el estado de un pedido. */
-export async function cambiarEstado(id: Id, estado: string): Promise<Pedido | null> {
+export async function cambiarEstado(id: Id, estado: unknown): Promise<Pedido | null> {
+  unoDe(estado, 'estado', ESTADOS_PERMITIDOS);
   const { rows } = await db.query<Pedido>(
     'UPDATE pedidos SET estado = $1 WHERE id = $2 RETURNING *',
     [estado, id]
