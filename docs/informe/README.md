@@ -9,7 +9,7 @@ David Cardozo, Alejo Simos, Naim Neman.
 - [Equipo B: identidad y control de acceso](equipo-b.md)
 - [Equipo C: navegador y borde HTTP](equipo-c.md)
 
-Cada falla se documenta con seis puntos: qué es y por qué importa, dónde está, cómo se observa, por qué ocurre, cómo se corrige y cómo se verifica. Las capturas van en `evidencias/equipo-<x>/`.
+Cada corrección se resume en una oración en el archivo de su equipo. Las capturas van en `evidencias/equipo-<x>/`.
 
 
 
