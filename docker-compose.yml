@@ -60,6 +60,7 @@ services:
       # y escribir datos (ver docker/initdb/02-usuario-aplicacion.sh).
       DB_USER: origen_app
       DB_PASSWORD: ${DB_PASSWORD:?definir DB_PASSWORD en .env}
+      SESSION_SECRET: ${SESSION_SECRET:?definir SESSION_SECRET en .env}
       UPLOADS_DIR: /app/uploads
       # Puerto publicado en el host, sólo para los mensajes de arranque.
       APP_PORT: "${APP_PORT:-8080}"
