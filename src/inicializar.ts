@@ -1,5 +1,6 @@
 import * as db from './db';
 import { CATALOGO } from './catalogo';
+import { hashear } from './services/usuarios.service';
 import type { Rol } from './tipos';
 
 interface UsuarioInicial {
@@ -11,11 +12,7 @@ interface UsuarioInicial {
 
 /**
  * Carga los datos iniciales (usuarios y catálogo) si la base está vacía.
- *
- * FALLA — Almacenamiento inseguro de credenciales:
- * las contraseñas de los usuarios se guardan en TEXTO PLANO.
- * La corrección es hashear con bcrypt + salt por usuario
- * (bcryptjs ya está instalado como dependencia del proyecto).
+ * Las contraseñas se guardan como hash bcrypt.
  */
 
 export const USUARIOS_INICIALES: UsuarioInicial[] = [
@@ -54,13 +51,28 @@ export const USUARIOS_INICIALES: UsuarioInicial[] = [
 export async function inicializarBase(): Promise<void> {
   // --- Usuarios -------------------------------------------------------------
   for (const usuario of USUARIOS_INICIALES) {
-    // FALLA: la contraseña se guarda tal cual, sin hash ni salt.
+    // Solo se hashea si el usuario no existe: bcrypt es lento a propósito.
+    const { rows } = await db.query('SELECT 1 FROM usuarios WHERE username = $1', [usuario.username]);
+    if (rows.length > 0) continue;
+
     await db.query(
       `INSERT INTO usuarios (username, password, rol, nombre)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (username) DO NOTHING`,
-      [usuario.username, usuario.password, usuario.rol, usuario.nombre]
+      [usuario.username, await hashear(usuario.password), usuario.rol, usuario.nombre]
     );
+  }
+
+  // Las filas que quedaron en texto plano de versiones anteriores se hashean
+  // con su misma contraseña, sin tener que borrar el volumen de la base.
+  const { rows: enClaro } = await db.query<{ id: number; password: string }>(
+    "SELECT id, password FROM usuarios WHERE password NOT LIKE '$2_$%'"
+  );
+  for (const fila of enClaro) {
+    await db.query('UPDATE usuarios SET password = $1 WHERE id = $2', [
+      await hashear(fila.password),
+      fila.id,
+    ]);
   }
 
   // --- Catálogo -------------------------------------------------------------
