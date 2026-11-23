@@ -18,41 +18,40 @@ type Id = number | string;
 /**
  * Servicio de catálogo.
  *
- * -----------------------------------------------------------------------------
- * FALLA — Inyección SQL (OWASP A03:2021)
- * -----------------------------------------------------------------------------
- * Los filtros del catálogo (tipo, variedad, búsqueda) se concatenan en el
- * texto SQL. Un valor con comillas rompe la consulta y permite modificar su
- * lógica: ampliar el conjunto de resultados, leer otras tablas mediante UNION
- * o incluso borrar datos.
- *
- * Corrección: consultas parametrizadas con $1, $2, ... y listas blancas
- * (validar que `tipo` sea uno de los valores conocidos antes de usarlo).
- * -----------------------------------------------------------------------------
+ * Los filtros y los ids viajan como parámetros ($1, $2, ...), separados del
+ * texto SQL, así que una comilla en la entrada no cambia la consulta.
  */
 
 /** Lista productos aplicando los filtros del menú. */
 export async function listar(filtros: FiltrosCatalogo = {}): Promise<ProductoConPrecio[]> {
   const { tipo, variedad, q } = filtros;
 
-  // FALLA: concatenación directa de entrada de usuario en la consulta.
-  let sql = 'SELECT * FROM productos WHERE activo = true';
-  if (tipo) sql += ` AND tipo = '${tipo}'`;
-  if (variedad) sql += ` AND variedad = '${variedad}'`;
-  if (q) {
-    sql += ` AND (nombre ILIKE '%${q}%' OR descripcion ILIKE '%${q}%')`;
+  const condiciones = ['activo = true'];
+  const valores: unknown[] = [];
+  if (tipo) {
+    valores.push(tipo);
+    condiciones.push(`tipo = $${valores.length}`);
   }
-  sql += ' ORDER BY tipo, variedad NULLS FIRST, id';
+  if (variedad) {
+    valores.push(variedad);
+    condiciones.push(`variedad = $${valores.length}`);
+  }
+  if (q) {
+    valores.push(`%${q}%`);
+    condiciones.push(`(nombre ILIKE $${valores.length} OR descripcion ILIKE $${valores.length})`);
+  }
 
-  const { rows } = await db.query<Producto>(sql);
+  const { rows } = await db.query<Producto>(
+    `SELECT * FROM productos WHERE ${condiciones.join(' AND ')} ORDER BY tipo, variedad NULLS FIRST, id`,
+    valores
+  );
 
   return rows.map((p) => ({ ...p, precio: calcularPrecio(p) }));
 }
 
 /** Obtiene un producto por id. */
 export async function obtener(id: Id): Promise<ProductoConPrecio | null> {
-  // FALLA: inyección SQL en el id.
-  const { rows } = await db.query<Producto>(`SELECT * FROM productos WHERE id = '${id}'`);
+  const { rows } = await db.query<Producto>('SELECT * FROM productos WHERE id = $1', [id]);
   if (!rows[0]) return null;
   return { ...rows[0], precio: calcularPrecio(rows[0]) };
 }

@@ -4,24 +4,10 @@ import type { Usuario } from '../tipos';
 /**
  * Servicio de usuarios.
  *
- * -----------------------------------------------------------------------------
- * FALLA — Inyección SQL (OWASP A03:2021)
- * -----------------------------------------------------------------------------
- * La consulta del login concatena el usuario y la contraseña directamente
- * dentro del texto SQL. El motor de PostgreSQL interpreta las comillas y los
- * operadores que venga en la entrada, de modo que la condición se puede
- * reescribir por completo y devolver una fila válida sin conocer la clave.
+ * Todas las consultas son parametrizadas ($1, $2, ...): la entrada del usuario
+ * viaja separada del texto SQL y el motor nunca la interpreta como código.
  *
- * Además:
- *  - La contraseña se compara en texto plano (almacenamiento inseguro).
- *  - El mensaje de error distingue "usuario inexistente" de "contraseña
- *    incorrecta" (enumeración de usuarios).
- *  - No hay límite de intentos (fuerza bruta).
- *
- * Corrección: consultas parametrizadas (`WHERE username = $1 AND password = $2`
- * con bcrypt.compare), mensaje genérico de error, y rate limiting + bloqueo
- * temporal en el endpoint de login.
- * -----------------------------------------------------------------------------
+ * FALLA pendiente: la contraseña se compara y se guarda en texto plano.
  */
 
 /** Busca un usuario por nombre de usuario exacto (query parametrizada). */
@@ -38,9 +24,10 @@ export async function buscarPorUsername(username: string): Promise<Usuario | nul
  * Devuelve el usuario o null.
  */
 export async function autenticar(username: string, password: string): Promise<Usuario | null> {
-  // FALLA: inyección SQL — la entrada del usuario se concatena en la consulta.
-  const sql = `SELECT * FROM usuarios WHERE username = '${username}' AND password = '${password}'`;
-  const { rows } = await db.query<Usuario>(sql);
+  const { rows } = await db.query<Usuario>(
+    'SELECT * FROM usuarios WHERE username = $1 AND password = $2',
+    [username, password]
+  );
   return rows[0] || null;
 }
 
