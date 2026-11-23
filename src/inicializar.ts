@@ -1,6 +1,7 @@
 import * as db from './db';
 import { CATALOGO } from './catalogo';
-import { hashear } from './services/usuarios.service';
+import bcrypt from 'bcryptjs';
+import { COSTO_BCRYPT } from './services/usuarios.service';
 import type { Rol } from './tipos';
 
 interface UsuarioInicial {
@@ -68,7 +69,7 @@ export async function inicializarBase(): Promise<void> {
       `INSERT INTO usuarios (username, password, rol, nombre)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (username) DO NOTHING`,
-      [usuario.username, await hashear(password), usuario.rol, usuario.nombre]
+      [usuario.username, await bcrypt.hash(password, COSTO_BCRYPT), usuario.rol, usuario.nombre]
     );
   }
 
@@ -82,7 +83,7 @@ export async function inicializarBase(): Promise<void> {
     const inicial = USUARIOS_INICIALES.find((u) => u.username === fila.username);
     const password = (inicial && process.env[inicial.variable]) || fila.password;
     await db.query('UPDATE usuarios SET password = $1 WHERE id = $2', [
-      await hashear(password),
+      await bcrypt.hash(password, COSTO_BCRYPT),
       fila.id,
     ]);
   }

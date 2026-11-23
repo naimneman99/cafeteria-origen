@@ -15,7 +15,7 @@ import type { Usuario } from '../tipos';
 /** Usuario sin la columna password. */
 export type UsuarioPublico = Omit<Usuario, 'password'>;
 
-const COSTO_BCRYPT = 12;
+export const COSTO_BCRYPT = 12;
 
 /** Hash contra el que se compara cuando el usuario no existe. */
 const HASH_DE_RELLENO = bcrypt.hashSync('usuario-inexistente', COSTO_BCRYPT);
