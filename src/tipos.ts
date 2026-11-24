@@ -60,6 +60,7 @@ export interface Sesion {
   usuario: UsuarioSesion;
   creadaEn: number;
   expiraEn: number | null;
+  ultimaActividadEn?: number;
 }
 
 /** Fila de la tabla `pedidos`. */
