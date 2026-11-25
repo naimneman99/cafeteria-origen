@@ -6,6 +6,8 @@
  * - Las peticiones que modifican estado (POST, PUT, PATCH, DELETE) deben
  *   provenir del mismo origen (si envían Origin o Referer) y adjuntar el token
  *   en la cabecera `X-CSRF-Token`, en `req.body._csrf` o en `req.query._csrf`.
+ * - `/api/auth/login` queda exento de token previo (no hay sesión autenticada aún),
+ *   manteniendo la validación de origen.
  */
 
 import crypto from 'crypto';
@@ -16,6 +18,7 @@ import { leerCookies } from './sesion';
 
 const NOMBRE_COOKIE_CSRF = 'csrf_token';
 const METODOS_SEGUROS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const RUTAS_EXENTAS_TOKEN = new Set(['/auth/login']);
 const FORMATO_TOKEN = /^[a-f0-9]{64}$/i;
 
 function compararConstante(a: string, b: string): boolean {
@@ -92,6 +95,14 @@ export function validarCsrf(req: Request, res: Response, next: NextFunction): vo
 
   if (!origenValido(req)) {
     res.status(403).json({ error: 'Origen de petición no permitido.' });
+    return;
+  }
+
+  if (RUTAS_EXENTAS_TOKEN.has(req.path)) {
+    if (req.body && typeof req.body === 'object' && '_csrf' in req.body) {
+      delete req.body._csrf;
+    }
+    next();
     return;
   }
 
