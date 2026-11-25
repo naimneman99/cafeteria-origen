@@ -4,8 +4,9 @@
 - VUL-24 (VAL-06): en `src/middleware/errores.ts` se ajusta `manejadorErrores` para devolver el mensaje controlado cuando `status < 500` y un mensaje genérico ante errores `500`, dejando el stack trace y el detalle técnico únicamente en los logs del servidor.
 - VUL-23 (CFG-03, CFG-04): se protege `src/routes/debug.routes.ts` con `requiereSesion` y `requiereRol('admin')`, eliminando el acceso a `process.env` y devolviendo únicamente datos no sensibles (`version` y `uptime`).
 - VUL-06 (XSS-02, productos y 404): se reemplazan los mensajes con interpolación de entrada del usuario en `rutaNoEncontrada` (`src/middleware/errores.ts`) y en `GET /api/productos/:id` (`src/routes/productos.routes.ts`) por mensajes fijos (`Ruta no encontrada.` y `Producto no encontrado.`).
+- VUL-05 y VUL-07 (XSS-01, cliente público): en `src/public/js/app.js` se eliminan `raw()`, `escaparHtml()` y todas las asignaciones de HTML sin escapar, reemplazándolas por un helper DOM (`crearEl`) basado en `document.createElement`, `document.createTextNode`, `textContent` y `replaceChildren` en catálogo, resultado de búsqueda, carrito, reseñas y mensajes de error.
+- VUL-08 (XSS-01, panel admin): en `src/public/js/admin.js` se reemplaza toda construcción de tablas, KPIs, cabecera de sesión y mensajes de feedback por `crearEl`, `textContent` y `replaceChildren`, y se valida el parámetro de URL `vista` contra una lista blanca de vistas permitidas antes de renderizarlo con `textContent`.
 
 Observaciones y verificación:
-- Pruebas manuales (localhost): capturas del antes y después en `docs/informe/evidencias/equipo-c/` (cabeceras en DevTools sin bloqueos de CSP, `/api/_diagnostico` protegido con 401/403, respuestas 404 sin HTML reflejado y errores sin stack trace).
-- Tests y checklist: verificados con `npm test`, `npm run test:seguridad`, `tests/extra-c.test.ts` y `npm run check:security` (`XSS-02`, `XSS-03`, `CFG-01`, `CFG-03`, `CFG-04` y `VAL-06` en verde).
-
+- Pruebas manuales (localhost): capturas del antes y después en `docs/informe/evidencias/equipo-c/` (cabeceras CSP sin bloqueos, `/api/_diagnostico` con 401/403, 404 y errores sin stack ni HTML reflejado, payloads XSS en buscador/reseñas/`?vista=` renderizados como texto plano o descartados, y verificación visual de todas las vistas del sitio y del panel).
+- Tests y checklist: verificados con `npm test`, `npm run test:seguridad` (28/29 en verde, pendiente únicamente CSRF), `tests/extra-c.test.ts` y `npm run check:security` (`XSS-01`, `XSS-02`, `XSS-03`, `CFG-01`, `CFG-03`, `CFG-04` y `VAL-06` en verde).
