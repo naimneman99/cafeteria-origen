@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -68,5 +70,23 @@ describe('Equipo C · Cabeceras, errores y diagnóstico', () => {
     assert.ok(res.status >= 400, `se esperaba error >= 400, respondió ${res.status}`);
     assert.equal(typeof res.body.error, 'string');
     assert.equal('stack' in res.body, false);
+  });
+});
+
+describe('Equipo C · XSS en el cliente (VUL-05, VUL-07, VUL-08)', () => {
+  const dirJs = path.join(__dirname, '..', 'src', 'public', 'js');
+
+  test('VUL-05 y VUL-07: app.js y admin.js no usan innerHTML ni la función insegura raw()', () => {
+    for (const archivo of ['app.js', 'admin.js']) {
+      const codigo = fs.readFileSync(path.join(dirJs, archivo), 'utf8');
+      assert.doesNotMatch(codigo, /\binnerHTML\b/, `${archivo} todavía contiene innerHTML`);
+      assert.doesNotMatch(codigo, /\bfunction\s+raw\s*\(/, `${archivo} todavía define raw()`);
+    }
+  });
+
+  test('VUL-08: admin.js valida el parámetro vista contra una lista blanca y usa textContent', () => {
+    const codigo = fs.readFileSync(path.join(dirJs, 'admin.js'), 'utf8');
+    assert.match(codigo, /VISTAS_PERMITIDAS/, 'admin.js debe validar vista contra una lista blanca');
+    assert.match(codigo, /#panel-bienvenida['"]\)\.textContent\s*=/);
   });
 });
