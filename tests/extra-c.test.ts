@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -7,8 +9,6 @@ import {
   limpiarDatosDePrueba,
   MARCA_PRUEBA,
 } from './helpers';
-import fs from 'fs';
-import path from 'path';
 
 describe('Equipo C · Cabeceras, errores y diagnóstico', () => {
   before(async () => {
@@ -71,7 +71,9 @@ describe('Equipo C · Cabeceras, errores y diagnóstico', () => {
     assert.equal(typeof res.body.error, 'string');
     assert.equal('stack' in res.body, false);
   });
-  describe('Equipo C · XSS en el cliente (VUL-05, VUL-07, VUL-08)', () => {
+});
+
+describe('Equipo C · XSS en el cliente (VUL-05, VUL-07, VUL-08)', () => {
   const dirJs = path.join(__dirname, '..', 'src', 'public', 'js');
 
   test('VUL-05 y VUL-07: app.js y admin.js no usan innerHTML ni la función insegura raw()', () => {
