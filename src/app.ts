@@ -3,6 +3,7 @@ import express from 'express';
 import helmet from 'helmet';
 
 import config from './config';
+import { emitirTokenCsrf, validarCsrf } from './middleware/csrf';
 import { rutaNoEncontrada, manejadorErrores } from './middleware/errores';
 import authRoutes from './routes/auth.routes';
 import productosRoutes from './routes/productos.routes';
@@ -44,6 +45,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/salud', (_req, res) => {
   res.json({ ok: true, servicio: 'cafeteria-origen', hora: new Date().toISOString() });
 });
+
+// Emisión y validación de token anti-CSRF (VUL-09).
+app.get('/api/csrf-token', emitirTokenCsrf);
+app.use('/api', validarCsrf);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/productos', productosRoutes);
