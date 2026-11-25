@@ -54,12 +54,47 @@
     return nodo;
   }
 
-  function api(url, opciones) {
-    return fetch(API + url, opciones).then(function (res) {
-      return res.json().catch(function () { return {}; }).then(function (data) {
-        return { ok: res.ok, status: res.status, data: data };
+  var csrfTokenCache = null;
+
+  function obtenerTokenCsrf(forzar) {
+    if (csrfTokenCache && !forzar) {
+      return Promise.resolve(csrfTokenCache);
+    }
+    return fetch(API + '/csrf-token', { credentials: 'same-origin' })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        csrfTokenCache = (data && (data.csrfToken || data.token)) || null;
+        return csrfTokenCache;
       });
-    });
+  }
+
+  function api(url, opciones, reintento) {
+    var opts = Object.assign({ credentials: 'same-origin' }, opciones || {});
+    var metodo = String(opts.method || 'GET').toUpperCase();
+    var esMutante = metodo === 'POST' || metodo === 'PUT' || metodo === 'PATCH' || metodo === 'DELETE';
+
+    var ejecutar = function (token) {
+      var headers = Object.assign({}, opts.headers || {});
+      if (token) headers['X-CSRF-Token'] = token;
+      var reqOpts = Object.assign({}, opts, { headers: headers });
+      return fetch(API + url, reqOpts).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (esMutante && res.status === 403 && !reintento) {
+            csrfTokenCache = null;
+            return obtenerTokenCsrf(true).then(function () {
+              return api(url, opciones, true);
+            });
+          }
+          return { ok: res.ok, status: res.status, data: data };
+        });
+      });
+    };
+
+    if (!esMutante) {
+      return ejecutar(null);
+    }
+
+    return obtenerTokenCsrf(false).then(ejecutar);
   }
 
   function postJSON(url, cuerpo) {
