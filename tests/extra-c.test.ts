@@ -6,9 +6,10 @@ import {
   agente,
   prepararBase,
   postConToken,
+  tokenCsrf,
+  productoPorNombre,
   limpiarDatosDePrueba,
-  MARCA_PRUEBA,
-} from './helpers';
+  MARCA_PRUEBA,} from './helpers';
 
 describe('Equipo C · Cabeceras, errores y diagnóstico', () => {
   before(async () => {
@@ -89,4 +90,92 @@ describe('Equipo C · XSS en el cliente (VUL-05, VUL-07, VUL-08)', () => {
     assert.match(codigo, /VISTAS_PERMITIDAS/, 'admin.js debe validar vista contra una lista blanca');
     assert.match(codigo, /#panel-bienvenida['"]\)\.textContent\s*=/);
   });
+  describe('Equipo C · Protección anti-CSRF (VUL-09)', () => {
+  let productoId: number;
+
+  before(async () => {
+    await prepararBase();
+    productoId = (await productoPorNombre('Espresso Pocillo Colombia')).id;
+  });
+
+  after(async () => {
+    await limpiarDatosDePrueba();
+  });
+
+  test('VUL-09: GET /api/csrf-token emite un token aleatorio y cookie csrf_token segura', async () => {
+    const ag1 = agente();
+    const ag2 = agente();
+
+    const res1 = await ag1.get('/api/csrf-token');
+    const res2 = await ag2.get('/api/csrf-token');
+
+    assert.equal(res1.status, 200);
+    assert.equal(res2.status, 200);
+    assert.match(String(res1.body.csrfToken ?? ''), /^[a-f0-9]{64}$/i);
+    assert.notEqual(res1.body.csrfToken, res2.body.csrfToken);
+
+    const cookies = (res1.headers['set-cookie'] as unknown as string[] | undefined) || [];
+    const cookieCsrf = cookies.find((c) => c.startsWith('csrf_token=')) || '';
+    assert.ok(cookieCsrf, 'debe setear la cookie csrf_token');
+    assert.match(cookieCsrf, /HttpOnly/i);
+    assert.match(cookieCsrf, /SameSite=Lax/i);
+  });
+
+  test('VUL-09: POST sin token CSRF se rechaza con 403', async () => {
+    const res = await agente().post('/api/comentarios').send({
+      autor: MARCA_PRUEBA,
+      texto: 'Intento sin token CSRF.',
+      calificacion: 5,
+    });
+    assert.equal(res.status, 403);
+  });
+
+  test('VUL-09: POST con token CSRF que no coincide con la cookie se rechaza con 403', async () => {
+    const ag = agente();
+    await ag.get('/api/csrf-token');
+
+    const res = await ag
+      .post('/api/comentarios')
+      .set('X-CSRF-Token', '0'.repeat(64))
+      .send({
+        autor: MARCA_PRUEBA,
+        texto: 'Intento con token falso.',
+        calificacion: 5,
+      });
+    assert.equal(res.status, 403);
+  });
+
+  test('VUL-09: POST desde un Origin distinto se rechaza con 403 aunque tenga token válido', async () => {
+    const ag = agente();
+    const token = await tokenCsrf(ag);
+    assert.ok(token);
+
+    const res = await ag
+      .post('/api/comentarios')
+      .set('Origin', 'https://atacante.ejemplo')
+      .set('X-CSRF-Token', token)
+      .send({
+        autor: MARCA_PRUEBA,
+        texto: 'Intento cross-origin.',
+        calificacion: 5,
+      });
+    assert.equal(res.status, 403);
+  });
+
+  test('VUL-09: POST con cabecera X-CSRF-Token válida funciona normalmente', async () => {
+    const ag = agente();
+    const token = await tokenCsrf(ag);
+    assert.ok(token);
+
+    const res = await ag
+      .post('/api/pedidos')
+      .set('X-CSRF-Token', token)
+      .send({
+        mesa: '1',
+        cliente: MARCA_PRUEBA,
+        items: [{ productoId, cantidad: 1 }],
+      });
+    assert.equal(res.status, 201);
+  });
+});
 });
