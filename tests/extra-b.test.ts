@@ -71,9 +71,14 @@ describe('Equipo B · Login endurecido (VUL-14, VUL-18, VUL-19, VUL-06)', () => 
     const sid = extraerSid(loginRes);
     assert.ok(sid, 'No se recibió la cookie sid tras el login');
 
+    // El logout cambia estado: necesita el token anti-CSRF (VUL-09).
+    const resToken = await request(app).get('/api/csrf-token').set('Cookie', `sid=${sid}`);
+    const token: string = resToken.body.csrfToken;
+
     const resLogout = await request(app)
       .post('/api/auth/logout')
-      .set('Cookie', `sid=${sid}`);
+      .set('Cookie', `sid=${sid}; csrf_token=${token}`)
+      .set('X-CSRF-Token', token);
     assert.equal(resLogout.status, 200);
     assert.equal(sesiones.has(sid), false, 'La sesión debe eliminarse del mapa sesiones al cerrar sesión');
 
