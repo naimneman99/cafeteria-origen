@@ -140,6 +140,11 @@
         feedback(caja, 'No pudimos iniciar sesión: ' + (resp.data.error || 'error desconocido'), false);
         return;
       }
+      if (resp.data.usuario.rol !== 'admin') {
+        postJSON('/auth/logout', {});
+        feedback(caja, 'El panel es solo para administradores.', false);
+        return;
+      }
       usuario = resp.data.usuario;
       mostrarPanel();
     });
@@ -585,7 +590,7 @@
 
     // ¿Ya hay sesión?
     api('/auth/yo').then(function (resp) {
-      if (resp.ok) {
+      if (resp.ok && resp.data.usuario.rol === 'admin') {
         usuario = resp.data.usuario;
         mostrarPanel();
       }
