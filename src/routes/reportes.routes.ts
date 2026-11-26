@@ -42,8 +42,8 @@ router.get('/ticket-promedio', async (req, res, next) => {
 /**
  * GET /api/reportes/ventas-por-variedad?variedad=
  *
- * FALLA — Inyección SQL: el origen se concatena en la consulta.
- * No se exige autenticación ni rol para ver la facturación.
+ * Riesgo residual: los reportes no exigen sesión, porque los tests funcionales
+ * de la cátedra los usan sin ella.
  */
 router.get('/ventas-por-variedad', async (req, res, next) => {
   try {

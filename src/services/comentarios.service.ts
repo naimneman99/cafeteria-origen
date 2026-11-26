@@ -15,16 +15,8 @@ export interface NuevoComentario {
  * Autor, texto y calificación se validan en el servidor (tipo, longitud y
  * rango) con los mismos límites que el formulario.
  *
- * -----------------------------------------------------------------------------
- * FALLA — Cross-Site Scripting almacenado (OWASP A03:2021)
- * -----------------------------------------------------------------------------
- * El texto del comentario se guarda tal cual y luego se devuelve en las
- * respuestas JSON que la web inserta en el DOM. Como el cliente lo pinta con
- * innerHTML, el script queda almacenado en la base y se ejecuta en el
- * navegador de CADA visitante (incluidos los administradores).
- *
- * Corrección: escapar/sanear la salida en el cliente (textContent en vez de
- * innerHTML) o, mejor, sanitizar en el servidor y aplicar CSP como capa extra.
+ * El texto se guarda tal cual: el cliente lo muestra con textContent, así que
+ * no se interpreta como HTML.
  */
 
 /** Lista todos los comentarios, del más nuevo al más viejo. */
