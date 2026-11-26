@@ -18,10 +18,10 @@
 
 ## Evidencia manual
 
-<!-- Capturas en docs/informe/evidencias/equipo-x/ -->
+<!-- Una sola captura por equipo: docs/evidencias/equipo-x.png -->
 
 ## Informe
 
-- [ ] Sección actualizada en `docs/informe/equipo-x.md`
+- [ ] Filas actualizadas en `docs/informe.md`
 - [ ] Rama rebaseada sobre `develop`
 - [ ] Solo se tocaron archivos propios del equipo
