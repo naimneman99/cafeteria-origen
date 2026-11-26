@@ -6,13 +6,8 @@ const router = express.Router();
 
 /**
  * POST /api/pedidos
- * Crea un pedido y devuelve su total calculado.
- *
- * FALLAS:
- *  - CSRF: no hay token anti-CSRF ni verificación de Origin/Referer, y la
- *    cookie de sesión no tiene SameSite. Una página externa puede POSTear
- *    con las cookies de la víctima.
- *  - No requiere autenticación ni rol.
+ * Crea un pedido y devuelve su total calculado. No requiere sesión: lo usan
+ * los clientes desde el sitio.
  */
 router.post('/', async (req, res, next) => {
   try {
@@ -28,9 +23,8 @@ router.post('/', async (req, res, next) => {
  * GET /api/pedidos?mesa=
  * Lista los pedidos de todas las mesas.
  *
- * FALLA — Inyección SQL en el filtro de mesa.
- * FALLA — Autorización: cualquier visitante puede ver los pedidos de TODAS
- * las mesas (los datos de los clientes de los demás).
+ * Riesgo residual (VUL-28): no exige sesión, porque los tests funcionales de
+ * la cátedra lo usan sin ella.
  */
 router.get('/', async (req, res, next) => {
   try {
@@ -42,7 +36,7 @@ router.get('/', async (req, res, next) => {
 
 /**
  * GET /api/pedidos/:id
- * FALLA — IDOR: no se verifica que el pedido pertenezca al usuario que pregunta.
+ * Riesgo residual (VUL-28): no verifica que el pedido sea de quien pregunta.
  */
 router.get('/:id', async (req, res, next) => {
   try {
@@ -60,7 +54,7 @@ router.get('/:id', async (req, res, next) => {
 router.patch('/:id/estado', async (req, res, next) => {
   try {
     const { estado } = req.body || {};
-    // FALLA: no se comprueba el rol del que modifica el pedido.
+    // Riesgo residual (VUL-28): no se comprueba el rol de quien cambia el estado.
     const pedido = await pedidos.cambiarEstado(idDeRuta(req.params.id), estado);
     if (!pedido) {
       return res.status(404).json({ error: 'Pedido no encontrado.' });

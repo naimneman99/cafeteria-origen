@@ -16,15 +16,8 @@ const limitadorLogin = rateLimit({
 });
 
 /**
- * Inicio de sesión.
- *
- * FALLAS:
- *  - Inyección SQL en la verificación de credenciales (ver usuarios.service).
- *  - Contraseñas almacenadas en texto plano.
- *  - Mensajes de error que distinguen "usuario inexistente" de "contraseña
- *    incorrecta" → enumeración de usuarios.
- *  - Sin rate limiting ni bloqueo: fuerza bruta ilimitada.
- *  - El identificador de sesión no se regenera (fijación de sesión).
+ * Inicio de sesión. Limitado a 5 intentos fallidos cada 15 minutos, con
+ * mensaje de error genérico y una sesión nueva en cada login.
  */
 router.post('/login', limitadorLogin, async (req, res, next) => {
   try {
@@ -34,7 +27,7 @@ router.post('/login', limitadorLogin, async (req, res, next) => {
       return res.status(400).json({ error: 'Falta usuario o contraseña.' });
     }
 
-    // La verificación de credenciales es la consulta concatenada (SQLi).
+    // Consulta parametrizada y comparación con bcrypt (ver usuarios.service).
     const usuario = await usuarios.autenticar(username, password);
 
     if (!usuario) {
@@ -71,9 +64,6 @@ router.post('/login', limitadorLogin, async (req, res, next) => {
 
 /**
  * Cierre de sesión.
- *
- * FALLA: sólo borra la cookie del navegador. La sesión sigue existiendo en el
- * servidor, así que con la cookie robada se puede seguir usando.
  */
 router.post('/logout', (req, res) => {
   // CORRECCIÓN (VUL-18 / AUTH-11): invalida la sesión en el servidor antes de limpiar la cookie.

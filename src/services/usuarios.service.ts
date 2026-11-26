@@ -58,8 +58,7 @@ export async function listar(): Promise<UsuarioPublico[]> {
 
 /**
  * Actualiza un usuario. Si llega una contraseña, se guarda su hash.
- * FALLA — Asignación masiva / escalada de privilegios: se actualiza el rol
- * sin verificar que quien llama tenga permiso para hacerlo.
+ * Solo la llama PUT /api/admin/usuarios/:id, que exige rol admin.
  */
 export async function actualizar(
   id: number | string,
