@@ -12,6 +12,8 @@
 # Ver logs:    docker compose logs -f app
 # Bajar todo: docker compose down
 # Resetear:   docker compose down -v   (borra el volumen de la base)
+#
+# Requiere un archivo .env: cp .env.example .env y completar los secretos.
 # =============================================================================
 
 services:
@@ -22,11 +24,12 @@ services:
     environment:
       POSTGRES_DB: origen
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      # VULNERABILIDAD (configuración): se usa una contraseña trivial y la base
-      # de datos acepta conexiones desde cualquier origen ("trust"), sin
-      # contraseña ni cifrado. Corregir → md5/scram-sha-256 + contraseña robusta.
-      POSTGRES_HOST_AUTH_METHOD: trust
+      # Las contraseñas salen del archivo .env (ver .env.example). Las
+      # conexiones por red se autentican con scram-sha-256.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definir POSTGRES_PASSWORD en .env}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      # Contraseña del usuario origen_app (la usa docker/initdb/02-usuario-aplicacion.sh).
+      DB_PASSWORD: ${DB_PASSWORD:?definir DB_PASSWORD en .env}
     volumes:
       - datos_origen:/var/lib/postgresql/data
       - ./docker/initdb:/docker-entrypoint-initdb.d:ro
@@ -53,12 +56,17 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: origen
-      # VULNERABILIDAD (mínimos privilegios): la aplicación se conecta con el
-      # superusuario `postgres`. Corregir → usar el usuario `origen_app` que
-      # sólo tiene permisos sobre las tablas del catálogo (ver
-      # docker/initdb/02-usuario-aplicacion.sql).
-      DB_USER: postgres
-      DB_PASSWORD: postgres
+      # Mínimos privilegios: la aplicación usa origen_app, que solo puede leer
+      # y escribir datos (ver docker/initdb/02-usuario-aplicacion.sh).
+      DB_USER: origen_app
+      DB_PASSWORD: ${DB_PASSWORD:?definir DB_PASSWORD en .env}
+      SESSION_SECRET: ${SESSION_SECRET:?definir SESSION_SECRET en .env}
+      # Contraseñas de las cuentas iniciales. La cuenta cuya variable falte no se crea.
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      VALENTINA_PASSWORD: ${VALENTINA_PASSWORD:-}
+      BARISTA_PASSWORD: ${BARISTA_PASSWORD:-}
+      MOZO_PASSWORD: ${MOZO_PASSWORD:-}
+      CLIENTE_PASSWORD: ${CLIENTE_PASSWORD:-}
       UPLOADS_DIR: /app/uploads
       # Puerto publicado en el host, sólo para los mensajes de arranque.
       APP_PORT: "${APP_PORT:-8080}"

@@ -1,44 +1,46 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import * as usuarios from '../services/usuarios.service';
 import { crearSesion, destruirSesion, obtenerSesion } from '../middleware/sesion';
 
 const router = express.Router();
 
+// Protección contra fuerza bruta (VUL-14 / AUTH-04): límite entre 3 y 9 intentos fallidos.
+const limitadorLogin = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { error: 'Demasiados intentos de inicio de sesión. Intentá nuevamente más tarde.' },
+});
+
 /**
- * Inicio de sesión.
- *
- * FALLAS:
- *  - Inyección SQL en la verificación de credenciales (ver usuarios.service).
- *  - Contraseñas almacenadas en texto plano.
- *  - Mensajes de error que distinguen "usuario inexistente" de "contraseña
- *    incorrecta" → enumeración de usuarios.
- *  - Sin rate limiting ni bloqueo: fuerza bruta ilimitada.
- *  - El identificador de sesión no se regenera (fijación de sesión).
+ * Inicio de sesión. Limitado a 5 intentos fallidos cada 15 minutos, con
+ * mensaje de error genérico y una sesión nueva en cada login.
  */
-router.post('/login', async (req, res, next) => {
+router.post('/login', limitadorLogin, async (req, res, next) => {
   try {
     const { username, password } = req.body || {};
 
-    if (!username || !password) {
+    if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) {
       return res.status(400).json({ error: 'Falta usuario o contraseña.' });
     }
 
-    // La verificación de credenciales es la consulta concatenada (SQLi).
+    // Consulta parametrizada y comparación con bcrypt (ver usuarios.service).
     const usuario = await usuarios.autenticar(username, password);
 
     if (!usuario) {
-      // FALLA — Enumeración de usuarios: el mensaje distingue entre
-      // "no existe" y "contraseña incorrecta", lo que permite a un atacante
-      // averiguar qué cuentas hay en el sistema.
-      const existe = await usuarios.buscarPorUsername(username);
-      if (existe) {
-        return res.status(401).json({ error: 'La contraseña es incorrecta.' });
-      }
-      return res
-        .status(401)
-        .json({ error: `El usuario "${username}" no existe en el sistema.` });
+      // CORRECCIÓN (VUL-19 / AUTH-12 y VUL-06 / XSS-02):
+      // Se unifica el mensaje para no permitir enumeración de usuarios ni reflejar
+      // el username crudo en la respuesta de error.
+      // (Antes distinguía entre "La contraseña es incorrecta." y
+      // `El usuario "${username}" no existe en el sistema.`).
+      return res.status(401).json({ error: 'Credenciales inválidas.' });
     }
 
+    // Regenera la sesión al autenticar para evitar fijación de sesión.
+    destruirSesion(req);
     crearSesion(req, res, {
       id: usuario.id,
       username: usuario.username,
@@ -62,11 +64,10 @@ router.post('/login', async (req, res, next) => {
 
 /**
  * Cierre de sesión.
- *
- * FALLA: sólo borra la cookie del navegador. La sesión sigue existiendo en el
- * servidor, así que con la cookie robada se puede seguir usando.
  */
 router.post('/logout', (req, res) => {
+  // CORRECCIÓN (VUL-18 / AUTH-11): invalida la sesión en el servidor antes de limpiar la cookie.
+  destruirSesion(req);
   res.clearCookie('sid', { path: '/' });
   res.json({ mensaje: 'Sesión cerrada.' });
 });

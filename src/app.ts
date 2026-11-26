@@ -1,7 +1,9 @@
 import path from 'path';
 import express from 'express';
+import helmet from 'helmet';
 
 import config from './config';
+import { emitirTokenCsrf, validarCsrf } from './middleware/csrf';
 import { rutaNoEncontrada, manejadorErrores } from './middleware/errores';
 import authRoutes from './routes/auth.routes';
 import productosRoutes from './routes/productos.routes';
@@ -13,16 +15,23 @@ import debugRoutes from './routes/debug.routes';
 
 const app = express();
 
-/**
- * FALLA — Ajustes de configuración (OWASP A05:2021)
- *
- * Faltan:
- *  - helmet (cabeceras de seguridad: CSP, X-Content-Type-Options, HSTS...)
- *  - límite de tamaño del cuerpo más estricto por ruta
- *  - rate limiting global
- *  - política de CORS restringida al propio origen
- *  - helmet CSP además sirve como capa extra frente al XSS
- */
+// Cabeceras de seguridad y Content Security Policy (VUL-25).
+// upgradeInsecureRequests queda desactivado para la demo local sobre HTTP.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        imgSrc: ["'self'", 'data:'],
+        upgradeInsecureRequests: null,
+      },
+    },
+  })
+);
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -32,10 +41,14 @@ app.use('/uploads', express.static(config.uploadsDir));
 // Sitio web estático
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- API --------------------------------------------------------------------
-app.get('/api/salud', (req, res) => {
+// --- API ---
+app.get('/api/salud', (_req, res) => {
   res.json({ ok: true, servicio: 'cafeteria-origen', hora: new Date().toISOString() });
 });
+
+// Emisión y validación de token anti-CSRF (VUL-09).
+app.get('/api/csrf-token', emitirTokenCsrf);
+app.use('/api', validarCsrf);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/productos', productosRoutes);
