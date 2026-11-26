@@ -18,6 +18,7 @@ Requisitos: **Docker Desktop** (o Docker Engine + Compose v2).
 
 ```bash
 cd cafeteria-origen
+cp .env.example .env
 docker compose up -d --build
 ```
 
